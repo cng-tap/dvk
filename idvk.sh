@@ -20,6 +20,7 @@
 ###########################################################################
 # Paths
 GIT_ANDROID_ROOT=https://android.googlesource.com/platform/
+branch=eclair-release
 #echo $GIT_ANDROID_ROOT
 
 # Names of projects used by the Dalvik build
@@ -161,10 +162,10 @@ function dalvik-get() {
 		unset command i
 		i=`expr index "$project" \;`	#; echo $i
 		if ((i)) ; then
-			command="git clone $GIT_ANDROID_ROOT${project/\\;/.git }"
+			command="git clone $GIT_ANDROID_ROOT${project/\\;/.git } -b $branch"
 			project=`expr substr $project 1 $((i - 2))` #; echo $project
 		else
-			command="git clone $GIT_ANDROID_ROOT${project}.git"
+			command="git clone $GIT_ANDROID_ROOT${project}.git -b $branch"
 		fi
 		
 		if [ -d $project ] ; then
