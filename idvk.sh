@@ -3,8 +3,9 @@
 ###########################################################################
 # Author: Avtar Singh, s.avtar@gmail.com
 # Last updated:
-#	16-July-2009	1.0 Release
-# 
+#	05-Sept-2016	1.0 Release
+# Modified by CnG
+#
 # 1.
 # Gets only code specific to Dalvik project and its dependencies from
 # the git repositories of the complete Android project.
