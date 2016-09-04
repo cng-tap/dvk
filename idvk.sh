@@ -40,6 +40,7 @@ PROJECTS="\
 	external/openssl\;external/openssl\
 	external/icu4c\;external/icu4c\
 	external/sqlite\;external/sqlite\
+	external/svox\;external/svox\
 	external/fdlibm\;external/fdlibm\
 	development\
 "
