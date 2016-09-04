@@ -18,7 +18,7 @@
 
 ###########################################################################
 # Paths
-GIT_ANDROID_ROOT=git://android.git.kernel.org/platform/
+GIT_ANDROID_ROOT=https://android.googlesource.com/platform/
 #echo $GIT_ANDROID_ROOT
 
 # Names of projects used by the Dalvik build
