@@ -22,17 +22,24 @@
 GIT_ANDROID_ROOT=https://android.googlesource.com/platform/
 branch=eclair-release
 #echo $GIT_ANDROID_ROOT
+Android=http://git.code.sf.net/p/android-x86/
+xbranch=eclair-x86
+#echo $Android
 
 # Names of projects used by the Dalvik build
 # Do NOT change the order below; even though the order below has no effect
 # on final make; remove dependencies further one by one starting from the bottom
+X86="\
+    bionic\
+    build\
+    dalvik\
+	development\
+	frameworks_base\;frameworks/base\
+	system_core\;system/core\
+"
+# From android repository
 PROJECTS="\
-	dalvik\
-	build\
-	system/core\;system/core\
-	frameworks/base\;frameworks/base\
 	external/safe-iop\;external/safe-iop\
-	bionic\
 	external/expat\;external/expat\
 	external/libpng\;external/libpng\
 	prebuilt\
@@ -44,7 +51,6 @@ PROJECTS="\
 	external/sqlite\;external/sqlite\
 	external/svox\;external/svox\
 	external/fdlibm\;external/fdlibm\
-	development\
 "
 # Additional projects to support x86 compilation
 PROJECTS+="\
@@ -157,6 +163,27 @@ function copy-product-files-x86() {
 ###########################################################################
 # Get code
 function dalvik-get() {
+	for x86 in $X86
+	do
+	    unset command x
+		x=`expr index "$x86" \;`	#; echo $x
+		if ((x)) ; then
+			command="git clone $Android${x86/\\;/.git } -b $xbranch"
+			project=`expr substr $x86 1 $((i - 2))` #; echo $x86
+		else
+			command="git clone $Android${x86}.git -b $xbranch"
+		fi
+		
+		if [ -d $x86 ] ; then
+			echo "Folder \"$x86\" already exists. Skipping."
+		else
+			$command
+			if (( $? )) ; then
+				echo "Get error: git command failure"
+				exit
+			fi
+		fi
+	done
 	for project in $PROJECTS
 	do
 		unset command i
@@ -252,6 +279,7 @@ fi
 # vendor/idvk/x86gen
 
 unset GIT_ANDROID_ROOT PROJECTS
+unset Android X86
 
 exit
 
