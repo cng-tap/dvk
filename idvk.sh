@@ -39,6 +39,7 @@ X86="\
 	libcore
 	prebuilt\
 	system_core\;system/core\
+	system_extras\;system/extras\
 "
 # From android repository
 PROJECTS="\
