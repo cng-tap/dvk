@@ -20,29 +20,36 @@
 ###########################################################################
 # Paths
 GIT_ANDROID_ROOT=https://android.googlesource.com/platform/
-branch=eclair-release
+branch=gingerbread-mr4-release
 #echo $GIT_ANDROID_ROOT
 Android=http://git.code.sf.net/p/android-x86/
-xbranch=eclair-x86
+xbranch=gingerbread-x86
 #echo $Android
 
 # Names of projects used by the Dalvik build
 # Do NOT change the order below; even though the order below has no effect
 # on final make; remove dependencies further one by one starting from the bottom
 X86="\
-    bionic\
-    build\
-    dalvik\
+	bionic\
+	build\
 	development\
+	external_alsa-lib\;external/alsa-lib\
+	external_alsa-utils\;external/alsa-utils\
 	frameworks_base\;frameworks/base\
+	libcore
+	prebuilt\
 	system_core\;system/core\
 "
 # From android repository
 PROJECTS="\
+	dalvik\
+	external/apache-http\;external/apache-http\
+	external/nist-sip\;external/nist-sip\
+	external/tagsoup\;external/tagsoup\
+	external/xmlwriter\;external/xmlwriter\
 	external/safe-iop\;external/safe-iop\
 	external/expat\;external/expat\
 	external/libpng\;external/libpng\
-	prebuilt\
 	external/zlib\;external/zlib\
 	external/elfutils\;external/elfutils\
 	external/elfcopy\;external/elfcopy\

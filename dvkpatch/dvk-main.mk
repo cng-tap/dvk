@@ -3,6 +3,7 @@ $(warning Avtar>> Using ONE_SHOT_MAKEFILE)
 $(warning Avtar>> Value $(ONE_SHOT_MAKEFILE))
 
 $(warning Avtar>> Including additional makefiles...)
+include libcore/sqlite-jdbc/Android.mk
 include build/tools/acp/Android.mk
 include build/libs/host/Android.mk
 include system/core/liblog/Android.mk

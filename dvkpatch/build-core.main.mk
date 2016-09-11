@@ -1,11 +1,23 @@
-
+# Only use ANDROID_BUILD_SHELL to wrap around bash.
+# DO NOT use other shells such as zsh.
+ifdef ANDROID_BUILD_SHELL
+SHELL := $(ANDROID_BUILD_SHELL)
+else
 # Use bash, not whatever shell somebody has installed as /bin/sh
 # This is repeated in config.mk, since envsetup.sh runs that file
 # directly.
 SHELL := /bin/bash
+endif
 
 # this turns off the suffix rules built into make
 .SUFFIXES:
+
+# this turns off the RCS / SCCS implicit rules of GNU Make
+% : RCS/%,v
+% : RCS/%
+% : %,v
+% : s.%
+% : SCCS/s.%
 
 # If a rule fails, delete $@.
 .DELETE_ON_ERROR:
@@ -30,7 +42,7 @@ ifeq (0,$(shell expr $$(echo $(MAKE_VERSION) | sed "s/[^0-9\.].*//") \>= 3.81))
 $(warning ********************************************************************************)
 $(warning *  You are using version $(MAKE_VERSION) of make.)
 $(warning *  You must upgrade to version 3.81 or greater.)
-$(warning *  see file://$(shell pwd)/docs/development-environment/machine-setup.html)
+$(warning *  see http://source.android.com/source/download.html)
 $(warning ********************************************************************************)
 $(error stopping)
 endif
@@ -41,8 +53,13 @@ TOPDIR :=
 BUILD_SYSTEM := $(TOPDIR)build/core
 
 # This is the default target.  It must be the first declared target.
+.PHONY: droid
 DEFAULT_GOAL := droid
 $(DEFAULT_GOAL):
+
+# Used to force goals to build.  Only use for conditionally defined goals.
+.PHONY: FORCE
+FORCE:
 
 # Set up various standard variables based on configuration
 # and host information.
@@ -53,6 +70,12 @@ include $(BUILD_SYSTEM)/config.mk
 # file does the rm -rf inline so the deps which are all done below will
 # be generated correctly
 include $(BUILD_SYSTEM)/cleanbuild.mk
+
+VERSION_CHECK_SEQUENCE_NUMBER := 2
+-include $(OUT_DIR)/versions_checked.mk
+ifneq ($(VERSION_CHECK_SEQUENCE_NUMBER),$(VERSIONS_CHECKED))
+
+$(info Checking build tools versions...)
 
 ifneq ($(HOST_OS),windows)
 ifneq ($(HOST_OS)-$(HOST_ARCH),darwin-ppc)
@@ -85,16 +108,53 @@ $(warning ************************************************************)
 $(error Directory names containing spaces not supported)
 endif
 
-# Set up version information.
-include $(BUILD_SYSTEM)/version_defaults.mk
+
+# Check for the correct version of java
+java_version := $(shell java -version 2>&1 | head -n 1 | grep '[ "]1\.6[\. "$$]')
+ifeq ($(strip $(java_version)),)
+$(info ************************************************************)
+$(info You are attempting to build with the incorrect version)
+$(info of java.)
+$(info $(space))
+$(info Your version is: $(shell java -version 2>&1 | head -n 1).)
+$(info The correct version is: 1.6.)
+$(info $(space))
+$(info Please follow the machine setup instructions at)
+$(info $(space)$(space)$(space)$(space)http://source.android.com/source/download.html)
+$(info ************************************************************)
+$(error stop)
+endif
+
+# Check for the correct version of javac
+javac_version := $(shell javac -version 2>&1 | head -n 1 | grep '[ "]1\.6[\. "$$]')
+ifeq ($(strip $(javac_version)),)
+$(info ************************************************************)
+$(info You are attempting to build with the incorrect version)
+$(info of javac.)
+$(info $(space))
+$(info Your version is: $(shell javac -version 2>&1 | head -n 1).)
+$(info The correct version is: 1.6.)
+$(info $(space))
+$(info Please follow the machine setup instructions at)
+$(info $(space)$(space)$(space)$(space)http://source.android.com/source/download.html)
+$(info ************************************************************)
+$(error stop)
+endif
+
+$(shell echo 'VERSIONS_CHECKED := $(VERSION_CHECK_SEQUENCE_NUMBER)' \
+        > $(OUT_DIR)/versions_checked.mk)
+endif
 
 # These are the modifier targets that don't do anything themselves, but
 # change the behavior of the build.
 # (must be defined before including definitions.make)
-INTERNAL_MODIFIER_TARGETS := showcommands
+INTERNAL_MODIFIER_TARGETS := showcommands checkbuild all
 
 # Bring in standard build system definitions.
 include $(BUILD_SYSTEM)/definitions.mk
+
+# Bring in dex_preopt.mk
+include $(BUILD_SYSTEM)/dex_preopt.mk
 
 ifneq ($(filter eng user userdebug tests,$(MAKECMDGOALS)),)
 $(info ***************************************************************)
@@ -125,6 +185,13 @@ endif
 ### between the build variants
 ###
 
+is_sdk_build :=
+
+ifneq ($(filter sdk win_sdk sdk_addon,$(MAKECMDGOALS)),)
+is_sdk_build := true
+endif
+
+
 ## user/userdebug ##
 
 user_variant := $(filter userdebug user,$(TARGET_BUILD_VARIANT))
@@ -137,20 +204,26 @@ ifneq (,$(user_variant))
   ifeq ($(user_variant),userdebug)
     # Pick up some extra useful tools
     tags_to_install += debug
+
+    # Enable Dalvik lock contention logging for userdebug builds.
+    ADDITIONAL_BUILD_PROPERTIES += dalvik.vm.lockprof.threshold=500
   else
     # Disable debugging in plain user builds.
     enable_target_debugging :=
   endif
- 
-  # TODO: Always set WITH_DEXPREOPT (for user builds) once it works on OSX.
-  # Also, remove the corresponding block in config/product_config.make.
+
+  # TODO: Remove this and the corresponding block in
+  # config/product_config.make once host-based Dalvik preoptimization is
+  # working.
+  ifneq (true,$(DISABLE_DEXPREOPT))
   ifeq ($(HOST_OS)-$(WITH_DEXPREOPT_buildbot),linux-true)
     WITH_DEXPREOPT := true
   endif
-  
+  endif
+
   # Disallow mock locations by default for user builds
   ADDITIONAL_DEFAULT_PROPERTIES += ro.allow.mock.location=0
-  
+
 else # !user_variant
   # Turn on checkjni for non-user builds.
   ADDITIONAL_BUILD_PROPERTIES += ro.kernel.android.checkjni=1
@@ -176,7 +249,8 @@ ifeq ($(TARGET_BUILD_VARIANT),eng)
 tags_to_install := user debug eng
   # Don't require the setup wizard on eng builds
   ADDITIONAL_BUILD_PROPERTIES := $(filter-out ro.setupwizard.mode=%,\
-          $(call collapse-pairs, $(ADDITIONAL_BUILD_PROPERTIES)))
+          $(call collapse-pairs, $(ADDITIONAL_BUILD_PROPERTIES))) \
+          ro.setupwizard.mode=OPTIONAL
 endif
 
 ## tests ##
@@ -187,18 +261,34 @@ endif
 
 ## sdk ##
 
-ifneq ($(filter sdk,$(MAKECMDGOALS)),)
+ifdef is_sdk_build
+
+# Detect if we want to build a repository for the SDK
+sdk_repo_goal := $(strip $(filter sdk_repo,$(MAKECMDGOALS)))
+MAKECMDGOALS := $(strip $(filter-out sdk_repo,$(MAKECMDGOALS)))
+
 ifneq ($(words $(filter-out $(INTERNAL_MODIFIER_TARGETS),$(MAKECMDGOALS))),1)
 $(error The 'sdk' target may not be specified with any other targets)
 endif
+
 # TODO: this should be eng I think.  Since the sdk is built from the eng
 # variant.
-tags_to_install := user
+tags_to_install := user debug eng
 ADDITIONAL_BUILD_PROPERTIES += xmpp.auto-presence=true
 ADDITIONAL_BUILD_PROPERTIES += ro.config.nocheckin=yes
 else # !sdk
-# Enable sync for non-sdk builds only (sdk builds lack SubscribedFeedsProvider).
-ADDITIONAL_BUILD_PROPERTIES += ro.config.sync=yes
+endif
+
+BUILD_WITHOUT_PV := true
+
+## precise GC ##
+
+ifneq ($(filter dalvik.gc.type-precise,$(PRODUCT_TAGS)),)
+  # Enabling type-precise GC results in larger optimized DEX files.  The
+  # additional storage requirements for ".odex" files can cause /system
+  # to overflow on some devices, so this is configured separately for
+  # each product.
+  ADDITIONAL_BUILD_PROPERTIES += dalvik.vm.dexopt-flags=m=y
 endif
 
 # Install an apns-conf.xml file if one's not already being installed.
@@ -209,18 +299,10 @@ ifeq (,$(filter %:system/etc/apns-conf.xml, $(PRODUCT_COPY_FILES)))
     $(warning implicitly installing apns-conf_sdk.xml)
   endif
 endif
-# Install a vold.conf file is one's not already being installed.
-ifeq (,$(filter %:system/etc/vold.conf, $(PRODUCT_COPY_FILES)))
-  PRODUCT_COPY_FILES += \
-	development/data/etc/vold.conf:system/etc/vold.conf
-  ifeq ($(filter eng tests,$(TARGET_BUILD_VARIANT)),)
-    $(warning implicitly installing vold.conf)
-  endif
-endif
 # If we're on an eng or tests build, but not on the sdk, and we have
 # a better one, use that instead.
 ifneq ($(filter eng tests,$(TARGET_BUILD_VARIANT)),)
-  ifeq ($(filter sdk,$(MAKECMDGOALS)),)
+  ifndef is_sdk_build
     apns_to_use := $(wildcard vendor/google/etc/apns-conf.xml)
     ifneq ($(strip $(apns_to_use)),)
       PRODUCT_COPY_FILES := \
@@ -236,7 +318,6 @@ ADDITIONAL_BUILD_PROPERTIES += net.bt.name=Android
 # the cause of ANRs in the content process
 ADDITIONAL_BUILD_PROPERTIES += dalvik.vm.stack-trace-file=/data/anr/traces.txt
 
-
 # ------------------------------------------------------------
 # Define a function that, given a list of module tags, returns
 # non-empty if that module should be installed in /system.
@@ -247,7 +328,7 @@ define should-install-to-system
 $(if $(filter tests,$(1)),,true)
 endef
 
-ifneq (,$(filter sdk,$(MAKECMDGOALS)))
+ifdef is_sdk_build
 # For the sdk goal, anything with the "samples" tag should be
 # installed in /data even if that module also has "eng"/"debug"/"user".
 define should-install-to-system
@@ -256,11 +337,11 @@ endef
 endif
 
 
-# If all they typed was make showcommands, we'll actually build
-# the default target.
-ifeq ($(MAKECMDGOALS),showcommands)
-.PHONY: showcommands
-showcommands: $(DEFAULT_GOAL)
+# If they only used the modifier goals (showcommands, checkbuild), we'll actually
+# build the default target.
+ifeq ($(filter-out $(INTERNAL_MODIFIER_TARGETS),$(MAKECMDGOALS)),)
+.PHONY: $(INTERNAL_MODIFIER_TARGETS)
+$(INTERNAL_MODIFIER_TARGETS): $(DEFAULT_GOAL)
 endif
 
 # These targets are going to delete stuff, don't bother including
@@ -281,35 +362,42 @@ endif
 # Bring in all modules that need to be built.
 ifneq ($(dont_bother),true)
 
-subdir_makefiles :=
+ifeq ($(HOST_OS)-$(HOST_ARCH),darwin-ppc)
+SDK_ONLY := true
+$(info Building the SDK under darwin-ppc is actually obsolete and unsupported.)
+$(error stop)
+endif
 
 ifeq ($(HOST_OS),windows)
-SDK_ONLY := true
-endif
-ifeq ($(HOST_OS)-$(HOST_ARCH),darwin-ppc)
 SDK_ONLY := true
 endif
 
 ifeq ($(SDK_ONLY),true)
 
+# ----- SDK for Windows ------
+# These configure the build targets that are available for the SDK under Windows.
+# The first section defines all the C/C++ tools that can be compiled in C/C++,
+# the second section defines all the Java ones (assuming javac is available.)
+
 subdirs := \
 	prebuilt \
 	build/libs/host \
+	build/tools/zipalign \
 	dalvik/dexdump \
 	dalvik/libdex \
 	dalvik/tools/dmtracedump \
-	development/emulator/mksdcard \
-	development/tools/activitycreator \
+	dalvik/tools/hprof-conv \
 	development/tools/line_endings \
+	development/tools/etc1tool \
+	sdk/emulator/mksdcard \
+	sdk/sdklauncher \
 	development/host \
 	external/expat \
 	external/libpng \
 	external/qemu \
 	external/sqlite/dist \
 	external/zlib \
-	frameworks/base/libs/utils \
-	frameworks/base/tools/aapt \
-	frameworks/base/tools/aidl \
+	frameworks/base \
 	system/core/adb \
 	system/core/fastboot \
 	system/core/libcutils \
@@ -319,26 +407,25 @@ subdirs := \
 # The following can only be built if "javac" is available.
 # This check is used when building parts of the SDK under Cygwin.
 ifneq (,$(shell which javac 2>/dev/null))
-$(warning sdk-only: javac available.)
 subdirs += \
 	build/tools/signapk \
-	build/tools/zipalign \
 	dalvik/dx \
-	dalvik/libcore \
+	libcore \
+	sdk/archquery \
+	sdk/androidprefs \
+	sdk/apkbuilder \
+	sdk/jarutils \
+	sdk/layoutlib_api \
+	sdk/layoutlib_utils \
+	sdk/ninepatch \
+	sdk/sdkstats \
+	sdk/sdkmanager \
+	sdk/layoutopt \
 	development/apps \
-	development/tools/androidprefs \
-	development/tools/apkbuilder \
-	development/tools/jarutils \
-	development/tools/layoutlib_utils \
-	development/tools/ninepatch \
-	development/tools/sdkstats \
-	development/tools/sdkmanager \
-	frameworks/base \
-	frameworks/base/tools/layoutlib \
-	external/googleclient \
+	development/tools/mkstubs \
 	packages
 else
-$(warning sdk-only: javac not available.)
+$(warning SDK_ONLY: javac not available.)
 endif
 
 # Exclude tools/acp when cross-compiling windows under linux
@@ -349,14 +436,14 @@ endif
 else	# !SDK_ONLY
 ifeq ($(BUILD_TINY_ANDROID), true)
 
-# TINY_ANDROID is a super-minimal build configuration, handy for board 
+# TINY_ANDROID is a super-minimal build configuration, handy for board
 # bringup and very low level debugging
-
-INTERNAL_DEFAULT_DOCS_TARGETS := 
 
 subdirs := \
 	bionic \
 	system/core \
+	system/extras/ext4_utils \
+	system/extras/su \
 	build/libs \
 	build/target \
 	build/tools/acp \
@@ -372,7 +459,6 @@ else	# !BUILD_TINY_ANDROID
 #
 # Typical build; include any Android.mk files we can find.
 #
-INTERNAL_DEFAULT_DOCS_TARGETS := offline-sdk-docs
 subdirs := $(TOP)
 
 FULL_BUILD := true
@@ -380,37 +466,6 @@ FULL_BUILD := true
 endif	# !BUILD_TINY_ANDROID
 
 endif	# !SDK_ONLY
-
-# Can't use first-makefiles-under here because
-# --mindepth=2 makes the prunes not work.
-subdir_makefiles += \
-	$(shell build/tools/findleaves.sh --prune="./out" $(subdirs) Android.mk)
-
-# Boards may be defined under $(SRC_TARGET_DIR)/board/$(TARGET_DEVICE)
-# or under vendor/*/$(TARGET_DEVICE).  Search in both places, but
-# make sure only one exists.
-# Real boards should always be associated with an OEM vendor.
-board_config_mk := \
-	$(strip $(wildcard \
-		$(SRC_TARGET_DIR)/board/$(TARGET_DEVICE)/BoardConfig.mk \
-		vendor/*/$(TARGET_DEVICE)/BoardConfig.mk \
-	))
-ifeq ($(board_config_mk),)
-  $(error No config file found for TARGET_DEVICE $(TARGET_DEVICE))
-endif
-ifneq ($(words $(board_config_mk)),1)
-  $(error Multiple board config files for TARGET_DEVICE $(TARGET_DEVICE): $(board_config_mk))
-endif
-include $(board_config_mk)
-TARGET_DEVICE_DIR := $(patsubst %/,%,$(dir $(board_config_mk)))
-board_config_mk :=
-
-# Clean up/verify variables defined by the board config file.
-TARGET_BOOTLOADER_BOARD_NAME := $(strip $(TARGET_BOOTLOADER_BOARD_NAME))
-
-#
-# Include all of the makefiles in the system
-#
 
 ifneq ($(ONE_SHOT_MAKEFILE),)
 # We've probably been invoked by the "mm" shell function
@@ -422,16 +477,27 @@ include $(TOPDIR)dvkpatch/dvk-main.mk
 # modules as a side-effect.  Do this after including ONE_SHOT_MAKEFILE
 # so that the modules will be installed in the same place they
 # would have been with a normal make.
-CUSTOM_MODULES := $(sort $(call get-tagged-modules,$(ALL_MODULE_TAGS),))
+CUSTOM_MODULES := $(sort $(call get-tagged-modules,$(ALL_MODULE_TAGS)))
 FULL_BUILD :=
-INTERNAL_DEFAULT_DOCS_TARGETS :=
 # Stub out the notice targets, which probably aren't defined
 # when using ONE_SHOT_MAKEFILE.
 NOTICE-HOST-%: ;
 NOTICE-TARGET-%: ;
-else
+
+else # ONE_SHOT_MAKEFILE
+
+#
+# Include all of the makefiles in the system
+#
+
+# Can't use first-makefiles-under here because
+# --mindepth=2 makes the prunes not work.
+subdir_makefiles := \
+	$(shell build/tools/findleaves.py --prune=out --prune=.repo --prune=.git $(subdirs) Android.mk)
+
 include $(subdir_makefiles)
-endif
+endif # ONE_SHOT_MAKEFILE
+
 # -------------------------------------------------------------------
 # All module makefiles have been included at this point.
 # -------------------------------------------------------------------
@@ -485,11 +551,7 @@ add-required-deps :=
 
 # Of the modules defined by the component makefiles,
 # determine what we actually want to build.
-# If a module has the "restricted" tag on it, it
-# poisons the rest of the tags and shouldn't appear
-# on any list.
 Default_MODULES := $(sort $(ALL_DEFAULT_INSTALLED_MODULES) \
-                          $(ALL_BUILT_MODULES) \
                           $(CUSTOM_MODULES))
 # TODO: Remove the 3 places in the tree that use
 # ALL_DEFAULT_INSTALLED_MODULES and get rid of it from this list.
@@ -514,12 +576,12 @@ else
 endif
 # Use tags to get the non-APPS user modules.  Use the product
 # definition files to get the APPS user modules.
-user_MODULES := $(sort $(call get-tagged-modules,user,_class@APPS restricted))
+user_MODULES := $(sort $(call get-tagged-modules,user shell_$(TARGET_SHELL)))
 user_MODULES := $(user_MODULES) $(user_PACKAGES)
 
-eng_MODULES := $(sort $(call get-tagged-modules,eng,restricted))
-debug_MODULES := $(sort $(call get-tagged-modules,debug,restricted))
-tests_MODULES := $(sort $(call get-tagged-modules,tests,restricted))
+eng_MODULES := $(sort $(call get-tagged-modules,eng))
+debug_MODULES := $(sort $(call get-tagged-modules,debug))
+tests_MODULES := $(sort $(call get-tagged-modules,tests))
 
 ifeq ($(strip $(tags_to_install)),)
 $(error ASSERTION FAILED: tags_to_install should not be empty)
@@ -542,7 +604,7 @@ endif
 # Don't include any GNU targets in the SDK.  It's ok (and necessary)
 # to build the host tools, but nothing that's going to be installed
 # on the target (including static libraries).
-ifneq ($(filter sdk,$(MAKECMDGOALS)),)
+ifdef is_sdk_build
   target_gnu_MODULES := \
               $(filter \
                       $(TARGET_OUT_INTERMEDIATES)/% \
@@ -555,7 +617,7 @@ ifneq ($(filter sdk,$(MAKECMDGOALS)),)
 endif
 
 
-# config/Makefile contains extra stuff that we don't want to pollute this
+# build/core/Makefile contains extra stuff that we don't want to pollute this
 # top-level makefile with.  It expects that ALL_DEFAULT_INSTALLED_MODULES
 # contains everything that's built during the current make, but it also further
 # extends ALL_DEFAULT_INSTALLED_MODULES.
@@ -565,6 +627,20 @@ modules_to_install := $(sort $(ALL_DEFAULT_INSTALLED_MODULES))
 ALL_DEFAULT_INSTALLED_MODULES :=
 
 endif # dont_bother
+
+# These are additional goals that we build, in order to make sure that there
+# is as little code as possible in the tree that doesn't build.
+modules_to_check := $(foreach m,$(ALL_MODULES),$(ALL_MODULES.$(m).CHECKED))
+
+# If you would like to build all goals, and not skip any intermediate
+# steps, you can pass the "all" modifier goal on the commandline.
+ifneq ($(filter all,$(MAKECMDGOALS)),)
+modules_to_check += $(foreach m,$(ALL_MODULES),$(ALL_MODULES.$(m).BUILT))
+endif
+
+# for easier debugging
+modules_to_check := $(sort $(modules_to_check))
+#$(error modules_to_check $(modules_to_check))
 
 # -------------------------------------------------------------------
 # This is used to to get the ordering right, you can also use these,
@@ -583,9 +659,15 @@ $(ALL_C_CPP_ETC_OBJECTS): | all_copied_headers
 
 # All the droid stuff, in directories
 .PHONY: files
-files: prebuilt $(modules_to_install) $(INSTALLED_ANDROID_INFO_TXT_TARGET)
+files: prebuilt \
+        $(modules_to_install) \
+        $(modules_to_check) \
+        $(INSTALLED_ANDROID_INFO_TXT_TARGET)
 
 # -------------------------------------------------------------------
+
+.PHONY: checkbuild
+checkbuild: $(modules_to_check)
 
 .PHONY: ramdisk
 ramdisk: $(INSTALLED_RAMDISK_TARGET)
@@ -613,36 +695,63 @@ droidcore: files \
 	$(INSTALLED_BOOTIMAGE_TARGET) \
 	$(INSTALLED_RECOVERYIMAGE_TARGET) \
 	$(INSTALLED_USERDATAIMAGE_TARGET) \
-	$(INTERNAL_DEFAULT_DOCS_TARGETS) \
 	$(INSTALLED_FILES_FILE)
 
-# The actual files built by the droidcore target changes depending
-# on the build variant.
-.PHONY: droid tests
-droid tests: droidcore
-
-$(call dist-for-goals, droid, \
-	$(INTERNAL_UPDATE_PACKAGE_TARGET) \
-	$(INTERNAL_OTA_PACKAGE_TARGET) \
-	$(SYMBOLS_ZIP) \
-	$(APPS_ZIP) \
-	$(INTERNAL_EMULATOR_PACKAGE_TARGET) \
-	$(PACKAGE_STATS_FILE) \
-	$(INSTALLED_FILES_FILE) \
-	$(INSTALLED_BUILD_PROP_TARGET) \
-	$(BUILT_TARGET_FILES_PACKAGE) \
- )
-
-# Tests are installed in userdata.img.  If we're building the tests
-# variant, copy it for "make tests dist".  Also copy a zip of the
-# contents of userdata.img, so that people can easily extract a
-# single .apk.
-ifeq ($(TARGET_BUILD_VARIANT),tests)
-$(call dist-for-goals, droid, \
-	$(INSTALLED_USERDATAIMAGE_TARGET) \
-	$(BUILT_TESTS_ZIP_PACKAGE) \
- )
+ifeq ($(EMMA_INSTRUMENT),true)
+  $(call dist-for-goals, droid, $(EMMA_META_ZIP))
 endif
+
+# dist_libraries only for putting your library into the dist directory with a full build.
+.PHONY: dist_libraries
+
+ifneq ($(TARGET_BUILD_APPS),)
+  # If this build is just for apps, only build apps and not the full system by default.
+
+  unbundled_build_modules :=
+  ifneq ($(filter all,$(TARGET_BUILD_APPS)),)
+    # If they used the magic goal "all" then build all apps in the source tree.
+    unbundled_build_modules := $(foreach m,$(sort $(ALL_MODULES)),$(if $(filter APPS,$(ALL_MODULES.$(m).CLASS)),$(m)))
+  else
+    unbundled_build_modules := $(TARGET_BUILD_APPS)
+  endif
+
+  # dist the unbundled app.
+  $(call dist-for-goals,apps_only, \
+    $(foreach m,$(unbundled_build_modules),$(ALL_MODULES.$(m).INSTALLED)) \
+  )
+
+.PHONY: apps_only
+apps_only: $(unbundled_build_modules)
+
+droid: apps_only
+
+else # TARGET_BUILD_APPS
+  $(call dist-for-goals, droidcore, \
+    $(INTERNAL_UPDATE_PACKAGE_TARGET) \
+    $(INTERNAL_OTA_PACKAGE_TARGET) \
+    $(SYMBOLS_ZIP) \
+    $(APPS_ZIP) \
+    $(INTERNAL_EMULATOR_PACKAGE_TARGET) \
+    $(PACKAGE_STATS_FILE) \
+    $(INSTALLED_FILES_FILE) \
+    $(INSTALLED_BUILD_PROP_TARGET) \
+    $(BUILT_TARGET_FILES_PACKAGE) \
+    $(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+    $(INSTALLED_RAMDISK_TARGET) \
+   )
+
+# Building a full system-- the default is to build droidcore
+droid: droidcore dist_libraries
+
+endif
+
+
+.PHONY: droid tests
+tests: droidcore
+
+# phony target that include any targets in $(ALL_MODULES)
+.PHONY: all_modules
+all_modules: $(ALL_MODULES)
 
 .PHONY: docs
 docs: $(ALL_DOCS)
@@ -650,28 +759,24 @@ docs: $(ALL_DOCS)
 .PHONY: sdk
 ALL_SDK_TARGETS := $(INTERNAL_SDK_TARGET)
 sdk: $(ALL_SDK_TARGETS)
-$(call dist-for-goals,sdk,$(ALL_SDK_TARGETS))
+ifneq ($(filter sdk win_sdk,$(MAKECMDGOALS)),)
+$(call dist-for-goals,sdk win_sdk, \
+	$(ALL_SDK_TARGETS) \
+	$(SYMBOLS_ZIP) \
+	$(INSTALLED_BUILD_PROP_TARGET) \
+ )
+endif
 
 .PHONY: findbugs
 findbugs: $(INTERNAL_FINDBUGS_HTML_TARGET) $(INTERNAL_FINDBUGS_XML_TARGET)
 
 .PHONY: clean
-dirs_to_clean := \
-	$(PRODUCT_OUT) \
-	$(TARGET_COMMON_OUT_ROOT) \
-	$(HOST_OUT) \
-	$(HOST_COMMON_OUT_ROOT)
 clean:
-	@for dir in $(dirs_to_clean) ; do \
-	    echo "Cleaning $$dir..."; \
-	    rm -rf $$dir; \
-	done
-	@echo "Clean."; \
-
-.PHONY: clobber
-clobber:
 	@rm -rf $(OUT_DIR)
 	@echo "Entire build directory removed."
+
+.PHONY: clobber
+clobber: clean
 
 # The rules for dataclean and installclean are defined in cleanbuild.mk.
 
@@ -680,9 +785,8 @@ clobber:
 modules:
 	@echo "Available sub-modules:"
 	@echo "$(call module-names-for-tag-list,$(ALL_MODULE_TAGS))" | \
-	      sed -e 's/  */\n/g' | sort -u | $(COLUMN)
+	      tr -s ' ' '\n' | sort -u | $(COLUMN)
 
 .PHONY: showcommands
 showcommands:
 	@echo >/dev/null
-
