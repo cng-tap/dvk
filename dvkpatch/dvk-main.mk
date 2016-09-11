@@ -36,6 +36,7 @@ include external/fdlibm/Android.mk
 # sh and toolbox form the basic shell and commands
 # linker is required at runtime
 # rest all are related to installer/bootloader
+include vendor/idvk/x86gen/firmware/firmware.mk
 include external/grub/Android.mk
 include external/genext2fs/Android.mk
 include system/core/cpio/Android.mk
