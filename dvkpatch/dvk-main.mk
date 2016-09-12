@@ -46,6 +46,7 @@ ifeq ($(TARGET_ARCH), x86)
 include vendor/idvk/$(TARGET_PRODUCT)/Android.mk
 endif
 
+include system/extras/ext4_utils/Android.mk
 include system/core/sh/Android.mk
 include system/core/toolbox/Android.mk
 include system/core/init/Android.mk
