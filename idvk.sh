@@ -30,20 +30,13 @@ xbranch=gingerbread-x86
 # Do NOT change the order below; even though the order below has no effect
 # on final make; remove dependencies further one by one starting from the bottom
 X86="\
-	bionic\
-	build\
-	development\
-	external_alsa-lib\;external/alsa-lib\
-	external_alsa-utils\;external/alsa-utils\
-	frameworks_base\;frameworks/base\
-	libcore
-	prebuilt\
-	system_core\;system/core\
-	system_extras\;system/extras\
 "
 # From android repository
 PROJECTS="\
+	bionic\
+	build\
 	dalvik\
+	development\
 	external/apache-http\;external/apache-http\
 	external/nist-sip\;external/nist-sip\
 	external/tagsoup\;external/tagsoup\
@@ -59,6 +52,11 @@ PROJECTS="\
 	external/sqlite\;external/sqlite\
 	external/svox\;external/svox\
 	external/fdlibm\;external/fdlibm\
+	frameworks_base\;frameworks/base\
+	libcore\
+	prebuilt\
+	system_core\;system/core\
+	system_extras\;system/extras\
 "
 # Additional projects to support x86 compilation
 PROJECTS+="\
