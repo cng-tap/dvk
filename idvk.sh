@@ -22,18 +22,18 @@
 GIT_ANDROID_ROOT=https://android.googlesource.com/platform/
 branch=gingerbread-mr4-release
 #echo $GIT_ANDROID_ROOT
-Android=http://git.code.sf.net/p/android-x86/
-xbranch=gingerbread-x86
+Android=https://github.com/CyanogenMod/
+xbranch=gb-release-7.2
 #echo $Android
 
 # Names of projects used by the Dalvik build
 # Do NOT change the order below; even though the order below has no effect
 # on final make; remove dependencies further one by one starting from the bottom
 X86="\
+	android_bionic\;bionic\
 "
 # From android repository
 PROJECTS="\
-	bionic\
 	build\
 	dalvik\
 	development\
