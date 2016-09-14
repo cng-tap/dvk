@@ -7,14 +7,10 @@ Get the source code
 
     cd dvk
 
-Run the idvk script and follow the instructions
+Run the build.sh script and extract the source code
 
-    ./idvk.sh
-
-Get Dalvik code and its dependencies
-
-    ./idvk.sh get x86
+    ./build.sh extract
 
 Build code and its dependencies
 
-    ./idvk.sh build x86
+    ./build.sh
