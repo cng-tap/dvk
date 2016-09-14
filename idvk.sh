@@ -53,10 +53,10 @@ PROJECTS="\
 	external/sqlite\;external/sqlite\
 	external/svox\;external/svox\
 	external/fdlibm\;external/fdlibm\
-	frameworks_base\;frameworks/base\
+	frameworks/base\;frameworks/base\
 	libcore\
 	system/core\;system/core\
-	systemextras\;system/extras\
+	system/extras\;system/extras\
 "
 # Additional projects to support x86 compilation
 PROJECTS+="\

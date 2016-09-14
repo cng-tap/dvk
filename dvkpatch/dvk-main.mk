@@ -7,7 +7,6 @@ include libcore/sqlite-jdbc/Android.mk
 include build/tools/acp/Android.mk
 include build/libs/host/Android.mk
 include system/core/liblinenoise/Android.mk
-include system/core/libreboot/Android.mk
 include system/core/liblog/Android.mk
 include system/core/libcutils/Android.mk
 include frameworks/base/tools/aapt/Android.mk
