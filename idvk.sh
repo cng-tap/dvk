@@ -73,21 +73,6 @@ CORE_MAKEFILE=build/core/root.mk
 VENDOR=idvk
 
 ###########################################################################
-# Build code for ARM
-function dalvik-buildarm() {
-	# run android environment setup, change directory and do a make
-	. build/envsetup.sh
-	cd dalvik
-	mm
-}
-
-###########################################################################
-# Clean build for ARM
-function dalvik-cleanarm() {
-	make clean
-}
-
-###########################################################################
 # Build code for x86
 function dalvik-buildx86() {
 	#ensure that product makefiles and other configuration files are present
@@ -245,7 +230,6 @@ invoke the script again with the following arguments:\n \
 \tclean\t\t: clean build for the specified architecture\n\n \
 \tArchitecture:\n \
 \t-------------\n \
-\tarm\t\t: for ARM (this is the default)\n \
 \tx86\t\t: for x86 generic\n"
 }
 
@@ -253,29 +237,21 @@ invoke the script again with the following arguments:\n \
 # Main
 if [ $# -eq 1 ] && [ $1_ = get_ ]; then
 	dalvik-get
-elif [ $# -eq 1 ] && [ $1_ = build_ ]; then
-	dalvik-buildarm
-elif [ $# -eq 1 ] && [ $1_ = clean_ ]; then
-	dalvik-cleanarm
 elif [ $# -eq 2 ] && [ $1_ = get_ ]; then
 	dalvik-get
 elif [ $# -eq 2 ] && [ $1_ = build_ ]; then
 	if [ $2_ = x86_ ]; then
 		PRODUCT=x86gen	#; echo $PRODUCT
 		dalvik-buildx86
-	elif [ $2_ = arm_ ]; then
-		dalvik-buildarm
 	else
-		echo "Unsupported architecture! Try using \"arm\" or \"x86\"."
+		echo "Unsupported architecture! Try using \"x86\"."
 	fi
 elif [ $# -eq 2 ] && [ $1_ = clean_ ]; then
 	if [ $2_ = x86_ ]; then
 		PRODUCT=x86gen
 		dalvik-cleanx86
-	elif [ $2_ = arm_ ]; then
-		dalvik-cleanarm
 	else
-		echo "Unsupported architecture! Try using \"arm\" or \"x86\"."
+		echo "Unsupported architecture! Try using \"x86\"."
 	fi
 else
 	dalvik-help
