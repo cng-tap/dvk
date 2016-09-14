@@ -7,6 +7,7 @@ include libcore/sqlite-jdbc/Android.mk
 include build/tools/acp/Android.mk
 include build/libs/host/Android.mk
 include system/core/liblinenoise/Android.mk
+include system/core/libdiskconfig/Android.mk
 include system/core/liblog/Android.mk
 include system/core/libcutils/Android.mk
 include frameworks/base/tools/aapt/Android.mk
@@ -37,14 +38,15 @@ include external/fdlibm/Android.mk
 # sh and toolbox form the basic shell and commands
 # linker is required at runtime
 # rest all are related to installer/bootloader
-include vendor/idvk/x86gen/firmware/firmware.mk
+include frameworks/base/cmds/pm/Android.mk
+include device/idvk/x86/firmware/firmware.mk
 include external/grub/Android.mk
 include external/genext2fs/Android.mk
 include system/core/cpio/Android.mk
-include bootable/diskinstaller/Android.mk
+include bootable/newinstaller/Android.mk
 
 ifeq ($(TARGET_ARCH), x86)
-include vendor/idvk/$(TARGET_PRODUCT)/Android.mk
+include device/idvk/$(TARGET_PRODUCT)/Android.mk
 endif
 
 include system/extras/ext4_utils/Android.mk
