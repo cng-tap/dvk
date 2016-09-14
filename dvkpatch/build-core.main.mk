@@ -12,13 +12,6 @@ endif
 # this turns off the suffix rules built into make
 .SUFFIXES:
 
-# this turns off the RCS / SCCS implicit rules of GNU Make
-% : RCS/%,v
-% : RCS/%
-% : %,v
-% : s.%
-% : SCCS/s.%
-
 # If a rule fails, delete $@.
 .DELETE_ON_ERROR:
 
@@ -42,7 +35,7 @@ ifeq (0,$(shell expr $$(echo $(MAKE_VERSION) | sed "s/[^0-9\.].*//") \>= 3.81))
 $(warning ********************************************************************************)
 $(warning *  You are using version $(MAKE_VERSION) of make.)
 $(warning *  You must upgrade to version 3.81 or greater.)
-$(warning *  see http://source.android.com/source/download.html)
+$(warning *  see http://source.android.com/download)
 $(warning ********************************************************************************)
 $(error stopping)
 endif
@@ -120,7 +113,7 @@ $(info Your version is: $(shell java -version 2>&1 | head -n 1).)
 $(info The correct version is: 1.6.)
 $(info $(space))
 $(info Please follow the machine setup instructions at)
-$(info $(space)$(space)$(space)$(space)http://source.android.com/source/download.html)
+$(info $(space)$(space)$(space)$(space)http://source.android.com/download)
 $(info ************************************************************)
 $(error stop)
 endif
@@ -136,19 +129,21 @@ $(info Your version is: $(shell javac -version 2>&1 | head -n 1).)
 $(info The correct version is: 1.6.)
 $(info $(space))
 $(info Please follow the machine setup instructions at)
-$(info $(space)$(space)$(space)$(space)http://source.android.com/source/download.html)
+$(info $(space)$(space)$(space)$(space)http://source.android.com/download)
 $(info ************************************************************)
 $(error stop)
 endif
 
 $(shell echo 'VERSIONS_CHECKED := $(VERSION_CHECK_SEQUENCE_NUMBER)' \
         > $(OUT_DIR)/versions_checked.mk)
+$(shell echo 'BUILDING_ON_32BIT := $(BUILDING_ON_32BIT)' \
+        >> $(OUT_DIR)/versions_checked.mk)
 endif
 
 # These are the modifier targets that don't do anything themselves, but
 # change the behavior of the build.
 # (must be defined before including definitions.make)
-INTERNAL_MODIFIER_TARGETS := showcommands checkbuild all
+INTERNAL_MODIFIER_TARGETS := showcommands checkbuild
 
 # Bring in standard build system definitions.
 include $(BUILD_SYSTEM)/definitions.mk
@@ -436,7 +431,7 @@ endif
 else	# !SDK_ONLY
 ifeq ($(BUILD_TINY_ANDROID), true)
 
-# TINY_ANDROID is a super-minimal build configuration, handy for board
+# TINY_ANDROID is a super-minimal build configuration, handy for board 
 # bringup and very low level debugging
 
 subdirs := \
@@ -576,7 +571,7 @@ else
 endif
 # Use tags to get the non-APPS user modules.  Use the product
 # definition files to get the APPS user modules.
-user_MODULES := $(sort $(call get-tagged-modules,user shell_$(TARGET_SHELL)))
+user_MODULES := $(sort $(call get-tagged-modules,user))
 user_MODULES := $(user_MODULES) $(user_PACKAGES)
 
 eng_MODULES := $(sort $(call get-tagged-modules,eng))
@@ -771,12 +766,20 @@ endif
 findbugs: $(INTERNAL_FINDBUGS_HTML_TARGET) $(INTERNAL_FINDBUGS_XML_TARGET)
 
 .PHONY: clean
+dirs_to_clean := \
+	$(PRODUCT_OUT) \
+	$(TARGET_COMMON_OUT_ROOT)
 clean:
-	@rm -rf $(OUT_DIR)
-	@echo "Entire build directory removed."
+	@for dir in $(dirs_to_clean) ; do \
+	    echo "Cleaning $$dir..."; \
+	    rm -rf $$dir; \
+	done
+	@echo "Clean."; \
 
 .PHONY: clobber
-clobber: clean
+clobber:
+	@rm -rf $(OUT_DIR)/*
+	@echo "Entire build directory removed."
 
 # The rules for dataclean and installclean are defined in cleanbuild.mk.
 

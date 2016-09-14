@@ -31,10 +31,11 @@ xbranch=gb-release-7.2
 # on final make; remove dependencies further one by one starting from the bottom
 X86="\
 	android_bionic\;bionic\
+	android_build\;build\
+	android_prebuilt\
 "
 # From android repository
 PROJECTS="\
-	build\
 	dalvik\
 	development\
 	external/apache-http\;external/apache-http\
@@ -54,9 +55,8 @@ PROJECTS="\
 	external/fdlibm\;external/fdlibm\
 	frameworks_base\;frameworks/base\
 	libcore\
-	prebuilt\
-	system_core\;system/core\
-	system_extras\;system/extras\
+	system/core\;system/core\
+	systemextras\;system/extras\
 "
 # Additional projects to support x86 compilation
 PROJECTS+="\
